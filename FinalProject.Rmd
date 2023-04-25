@@ -55,6 +55,6 @@ survival <- master_raw %>%
 #Removing NR
   filter(Lineage != "NR")
 #Saving data to csv file
-  write.csv(survival, "survival.csv")
+write.csv(survival, "survival.csv")
 ```
 
