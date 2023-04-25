@@ -1,0 +1,60 @@
+#Final Project
+
+##Getting necessary packages
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+```
+
+##Importing Master_Datasheet
+```{r}
+master_raw <- read.csv(file = 'Master_Spreadsheet_2023.csv', header = TRUE)
+```
+
+##Creating a file that can be fed into SPSS
+
+```{r}
+#Removing any oysters without tags
+survival <- master_raw %>%
+  filter(Pit.Tag.End.Num != "no tag",
+         Pit.Tag.End.Num != "NA", 
+         !is.na(Pit.Tag.End.Num), 
+         !is.na(Lineage)) %>%
+#Renaming lineages
+  mutate(Lineage = recode(Lineage, 
+                          "Mv"="MV",
+                          "FI" = "CL1",
+                          "NEH" = "CL2")) %>%
+#Assigning ages to oysters at collection time
+  mutate(Months = recode(Date, 
+         "19-Jul-21"=4,
+         "28-Jul-21"=4,
+         "26-Aug-21"=5,
+         "25-Oct-21"=7,
+         "24-May-22"=14,
+         "19-Oct-22"=19
+         )) %>% 
+#Updating status for oysters
+  mutate(Status = recode(Status,
+                         "Alive"=1,
+                         "alive"=1,
+                         "alive, no pic"=1,
+                         "dead"=10,
+                         "missing"=1,
+                         "Dead"=10,
+                         "Missing"=1,
+                         "Missing " = 1)) %>%
+#Keeping only relevant columns
+  select(Lineage, Pit.Tag.End.Num, Status, Months) %>%
+  group_by(Lineage, Pit.Tag.End.Num) %>%
+#Keeping maximum age of oysters and status
+  summarize(Age = max(Months), Survived = sum(Status)) %>%
+#Changing status of of oysters to either 0 or 1 based on if it survived
+  mutate(Survived = ifelse(Survived >= 10, 0, 1)) %>%
+#Keeping relevant columns
+  select(Lineage, Pit.Tag.End.Num, Survived, Age) %>%
+#Removing NR
+  filter(Lineage != "NR")
+#Saving data to csv file
+  write.csv(survival, "survival.csv")
+```
+
