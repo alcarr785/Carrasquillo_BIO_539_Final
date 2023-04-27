@@ -3,11 +3,47 @@
 ##Getting necessary packages
 ```{r message=FALSE, warning=FALSE}
 library(tidyverse)
+library(cowplot)
 ```
 
 ##Importing Master_Datasheet
 ```{r}
 master_raw <- read.csv(file = 'Master_Spreadsheet_2023.csv', header = TRUE)
+```
+
+##Filtering master_raw to get data we need to determine yield
+```{r}
+#Creating a list of lineages to be used later when plotting
+Lineages <- c("CL1", "CL2", "CT", "GH", "MV", "NR")
+yield <- master_raw %>% 
+#Renaming commercial lines to keep them anonymous
+  mutate(Lineage = recode(Lineage, FI="CL1", NEH="CL2")) %>%
+#Fixing a mistake in the sheet where lineage was accidentally entered as "Mv" instead of "MV"
+  mutate(Lineage = recode(Lineage, Mv="MV")) %>%
+#Keeping only oysters recored at the end of the study that survived.
+  filter(Date == "19-Oct-22", Status == "alive") %>%
+#Removing oysters with missing tags
+  filter(Pit.Tag.End.Num != "no tag") %>%
+  filter(!is.na(Length)) %>%
+#Keeping only relevant information
+  select(Date, Lineage, Oyster.Number, Length, Bag.Number) %>%
+  group_by(Lineage, Bag.Number) %>%
+#Getting the sum of each bag
+  summarize(Total_yield = sum(as.numeric(Length))) %>%
+#Defining oysters as either wild or commercial
+  mutate(Type = ifelse(Lineage == "CL1" | Lineage == "CL2", "Commercial", "Wild")) %>%
+#Removing Bag 1 from GH, because many oysters had spilled out of it
+  mutate(Rm = ifelse(Lineage == "GH" & Bag.Number == "1", 1, 0)) %>%
+  filter(Rm != 1) %>%
+  select(Lineage, Total_yield, Bag.Number, Type)
+```
+##Creating a boxplot for yield
+```{r}
+ggplot(yield, aes(x=factor(Lineage, Lineages), y=Total_yield, fill = Type))+
+  geom_boxplot()+
+  labs(x = "Lineages", y="Yield (Shell Length in mm)")+
+  stat_summary(geom="errorbar", fun = mean)+
+  ggtitle("Average Oyster Yield per Lineage")
 ```
 
 ##Creating a file that can be fed into SPSS
@@ -55,6 +91,55 @@ survival <- master_raw %>%
 #Removing NR
   filter(Lineage != "NR")
 #Saving data to csv file
-write.csv(survival, "survival.csv")
+#write.csv(survival, "survival.csv")
+```
+##Determining oyster size in each bag
+```{r}
+size <- master_raw %>%
+  #Changing date to character
+  mutate(Date = as.character(Date)) %>%
+  #Renaming lineages
+  mutate(Lineage = recode(Lineage, Mv = "MV", FI="CL1", NEH="CL2")) %>%
+  #Keeping only oysters that survived to the end of the experiment and were measured
+  filter(Date == "19-Oct-22") %>%
+  filter(!is.na(Length)) %>%
+  filter(Length != "missing") %>%
+  filter(Length != "dead") %>%
+  filter(Length != "alive, no pic") %>%
+  mutate(Length = as.numeric(as.character(Length))) %>%
+  select(Lineage, Pit.Tag.End.Num, Length)
+#Creating a histogram for all 6 lineages
+CL1 <- ggplot(subset(size, Lineage == "CL1"), aes(x=Length)) + 
+  geom_histogram(binwidth = 7, color = "black", fill = "#F8766D") +
+  ggtitle("Commercial Line 1 (CL1)") +
+  xlim(c(25, 110)) +
+  labs(x="Shell Length (mm)")
+CL2 <- ggplot(subset(size, Lineage == "CL2"), aes(x=Length)) + 
+  geom_histogram(binwidth = 7, color = "black", fill = "#F8766D") +
+  ggtitle("Commercial Line 2 (CL2)") +
+  xlim(c(25, 110)) +
+  labs(x="Shell Length (mm)")
+CT <- ggplot(subset(size, Lineage == "CT"), aes(x=Length)) + 
+  geom_histogram(binwidth = 7, color = "black", fill = "#619CFF") +
+  ggtitle("Connecticut (CT)") +
+  xlim(c(25, 110)) +
+  labs(x="Shell Length (mm)")
+MV <- ggplot(subset(size, Lineage == "MV"), aes(x=Length)) + 
+  geom_histogram(binwidth = 7, color = "black", fill = "#619CFF") +
+  ggtitle("Martha's Vineyard (MV)") +
+  xlim(c(25, 110)) +
+  labs(x="Shell Length (mm)")
+GH <- ggplot(subset(size, Lineage == "GH"), aes(x=Length)) + 
+  geom_histogram(binwidth = 7, color = "black", fill = "#619CFF") +
+  ggtitle("Green Hill Pond (GH)") +
+  xlim(c(25, 110)) +
+  labs(x="Shell Length (mm)")
+NR <- ggplot(subset(size, Lineage == "NR"), aes(x=Length)) + 
+  geom_histogram(binwidth = 7, color = "black", fill = "#619CFF") +
+  ggtitle("Narrow River (NR)") +
+  xlim(c(25, 110)) +
+  labs(x="Shell Length (mm)")
+#Plotting all histograms on a single plot
+plot_grid(CL1, CL2, CT, MV, GH, NR, nrow = 3, ncol = 2)
 ```
 
