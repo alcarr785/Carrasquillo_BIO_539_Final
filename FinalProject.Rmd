@@ -141,5 +141,10 @@ NR <- ggplot(subset(size, Lineage == "NR"), aes(x=Length)) +
   labs(x="Shell Length (mm)")
 #Plotting all histograms on a single plot
 plot_grid(CL1, CL2, CT, MV, GH, NR, nrow = 3, ncol = 2)
+#Testing for normality
+shapiro.test(size$Length)
+#Doing a Kruskal-Wallis Test in place of an Anova
+size_kruskal_wallis  <- kruskal.test(size$Length ~ size$Lineage)
+print(size_kruskal_wallis)
 ```
 
